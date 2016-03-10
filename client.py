@@ -1,5 +1,7 @@
 import socket
 import sys
+from address import address
+
 
 HOST = "localhost"
 port = int(sys.argv[1])
@@ -9,11 +11,11 @@ bucketAddress[0] = "{} {}".format(HOST, port)
 
 while True:
     data = input("command: ")
-    if data.split()[0] == "STOP":
+    if data.split()[0].upper() == "STOP":
         break       
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-	# Connect to server and send data
+    # Connect to server and send data
         sock.connect((HOST, port))
         sock.sendall(bytes(data + "\n", "utf-8"))
     # Receive data from the server
@@ -30,4 +32,4 @@ while True:
             i+=3
     print("Sent:     {}".format(data))
     print("Received: {}".format(received))
-    print(bucketAddress)
+#     print(bucketAddress)
