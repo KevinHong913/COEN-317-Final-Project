@@ -20,18 +20,21 @@ class Coordinator(Bucket):
         Bucket.__init__(self, tcpHandler)
         Bucket.bucketNbr = 0
         Bucket.bucketList[0] = "{} {}".format(self.myHost, self.myPort)
+        Bucket.coHost, Bucket.coPort = self.myHost, self.myPort
         Coordinator.totalBuckets = 1
         self.server.serve_forever()
 
     def split():
         oldBucket = Bucket.fs.splitPtr
-        newBucket = Bucket.fs.splitPtr + 2**Bucket.fs.level
+        newBucket = Bucket.fs.extent
+#         newBucket = Bucket.fs.splitPtr + 2**Bucket.fs.level
         print("old: {}; new: {}".format(oldBucket, newBucket))
+        Bucket.fs = FileState(newBucket+1)
         Coordinator.requestRehash(oldBucket, newBucket)
-        Bucket.fs.splitPtr += 1
-        if Bucket.fs.splitPtr == 2**Bucket.fs.level:
-            Bucket.fs.level += 1
-            Bucket.fs.splitPtr = 0
+#         Bucket.fs.splitPtr += 1
+#         if Bucket.fs.splitPtr == 2**Bucket.fs.level:
+#             Bucket.fs.level += 1
+#             Bucket.fs.splitPtr = 0
         print(Bucket.fs)
         return newBucket
 
@@ -46,7 +49,7 @@ class Coordinator(Bucket):
                 # Connect to server and send data
                 sock.connect((bucketHost, bucketPort))
                 print("Connected to {}:{}".format(bucketHost, bucketPort))
-                data = "REHASH {} {}".format(Bucket.fs.level, Bucket.fs.splitPtr)
+                data = "REHASH {}".format(Bucket.fs.extent)
                 sock.sendall(bytes(data + "\n", "utf-8"))
                 received = str(sock.recv(1024), "utf-8")
             finally:
@@ -62,7 +65,7 @@ class Coordinator(Bucket):
         command = lista[0].upper()
         try:
             if command == "INSERT":
-                Bucket.insert(int(lista[1]), lista[2])
+                Coordinator.insert(int(lista[1]), lista[2])
                 return "ACK"
             elif command == "QUERY":
                 return Bucket.query(int(lista[1]))
@@ -82,6 +85,11 @@ class Coordinator(Bucket):
                 return "NOPE"
         except KeyError:
             return "key error"
+
+    def insert(key, val):
+        Bucket.dicc[key] = val
+        if len(Bucket.dicc) > 2:
+            Coordinator.split()
 
 
 coordinator = Coordinator(MyTCPHandler)

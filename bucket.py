@@ -4,8 +4,6 @@ import sys
 from multiprocessing import Pool
 from address import address
 from file_state import FileState
-from math import log
-
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
@@ -42,8 +40,7 @@ class Bucket:
             received = str(sock.recv(1024), "utf-8")
             print(received)
             Bucket.bucketNbr = int(received)
-            Bucket.fs.level = int(log(Bucket.bucketNbr+1, 2))
-            Bucket.fs.splitPtr = Bucket.bucketNbr + 1 - 2**Bucket.fs.level
+            Bucket.fs = FileState(Bucket.bucketNbr+1)
             print(Bucket.fs)
             Bucket.bucketList[Bucket.bucketNbr] = '{} {}'.format(self.myHost, self.myPort)
         finally:
@@ -67,6 +64,7 @@ class Bucket:
                 Bucket.population(lista)
                 return "ACK"
             elif command == "REHASH":
+                Bucket.fs = FileState(int(lista[1]))
                 Bucket.rehash(Bucket.fs)
                 return "ACK"
             else:   #TODO
@@ -75,8 +73,19 @@ class Bucket:
             return "key error"
 
     def insert(key, val):
-        if address(key, Bucket.fs) == Bucket.bucketNbr:
-            Bucket.dicc[key] = val
+        Bucket.dicc[key] = val
+        if len(Bucket.dicc) > 2 and Bucket.bucketNbr > 0:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                # Connect to server and send data
+                sock.connect((Bucket.coHost, Bucket.coPort))
+                data = "SPLIT"
+                sock.sendall(bytes(data + "\n", "utf-8"))
+                # Receive data from the server
+                received = str(sock.recv(1024), "utf-8")
+            finally:
+                #Close connection
+                sock.close()
 
     def query(key):
         return Bucket.dicc[key]
@@ -92,7 +101,46 @@ class Bucket:
     def rehash(fs):
         # rehash each key
         print("Rehashing")
-        pass    #TODO
+        print(fs)
+        deleteList = []
+        for key in Bucket.dicc:
+            location = address(key, fs)
+            if location == Bucket.bucketNbr:
+                print("No need to rehash for key {}".format(key))
+                continue
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if location not in Bucket.bucketList:
+                try:
+                    # Connect to server and send data
+                    sock.connect((Bucket.coHost, Bucket.coPort))
+                    data = "POPULATE"
+                    sock.sendall(bytes(data + "\n", "utf-8"))
+                    # Receive data from the server
+                    received = str(sock.recv(1024), "utf-8")
+                finally:
+                    #Close connection
+                    sock.close()
+                #process reply
+                reply = received.split()
+                if reply[0] == "POPULATION":
+                    Bucket.population(reply)
+            destAddress = Bucket.bucketList[location].split()
+            destHost, destPort = destAddress[0], int(destAddress[1])
+            try:
+                sock.connect((destHost, destPort))
+                data = "INSERT {} {}".format(key, Bucket.dicc[key])
+                sock.sendall(bytes(data + "\n", "utf-8"))
+                received = str(sock.recv(1024), "utf-8")
+                if received == "ACK":
+                    deleteList.append(key)
+            finally:
+                #Close connection
+                sock.close()
+            print(received)
+        for key in deleteList:
+            Bucket.dicc.pop(key)
+
+             
 
 if __name__ == '__main__':            
     bucket = Bucket(MyTCPHandler)
