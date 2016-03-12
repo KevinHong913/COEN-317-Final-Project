@@ -27,18 +27,15 @@ class Coordinator(Bucket):
     def split():
         oldBucket = Bucket.fs.splitPtr
         newBucket = Bucket.fs.extent
-#         newBucket = Bucket.fs.splitPtr + 2**Bucket.fs.level
         print("old: {}; new: {}".format(oldBucket, newBucket))
+        if newBucket not in Bucket.bucketList:
+            return "SpaceLimitExceeded"
         Bucket.fs = FileState(newBucket+1)
-        Coordinator.requestRehash(oldBucket, newBucket)
-#         Bucket.fs.splitPtr += 1
-#         if Bucket.fs.splitPtr == 2**Bucket.fs.level:
-#             Bucket.fs.level += 1
-#             Bucket.fs.splitPtr = 0
+        Coordinator.requestRehash(oldBucket)
         print(Bucket.fs)
-        return newBucket
+        return "ACK"
 
-    def requestRehash(oldBucket, newBucket):
+    def requestRehash(oldBucket):
         if oldBucket == Bucket.bucketNbr:
             Bucket.rehash(Bucket.fs)
         else:
@@ -51,7 +48,9 @@ class Coordinator(Bucket):
                 print("Connected to {}:{}".format(bucketHost, bucketPort))
                 data = "REHASH {}".format(Bucket.fs.extent)
                 sock.sendall(bytes(data + "\n", "utf-8"))
-                received = str(sock.recv(1024), "utf-8")
+#                received = str(sock.recv(1024), "utf-8")
+#                Waiting for the response will cause a dead lock if the target
+#                bucket would like to populate bucketList
             finally:
                 #Close connection
                 sock.close()
@@ -63,10 +62,15 @@ class Coordinator(Bucket):
         lista = msg.split()
         print(lista)
         command = lista[0].upper()
+        if len(lista) > 1 and command in ("INSERT", "QUERY"):
+            key = int(lista[1])
+            location = address(key, Bucket.fs)
+            if location != Bucket.bucketNbr:
+                return Bucket.forward(location, msg)
         try:
             if command == "INSERT":
-                Coordinator.insert(int(lista[1]), lista[2])
-                return "ACK"
+                return Coordinator.insert(int(lista[1]), lista[2])
+#                 return "ACK"
             elif command == "QUERY":
                 return Bucket.query(int(lista[1]))
             elif command == "REGISTER":
@@ -79,8 +83,7 @@ class Coordinator(Bucket):
             elif command == "POPULATE":
                 return "POPULATION "+' '.join("{} {}".format(k,v) for k,v in Bucket.bucketList.items())
             elif command == "SPLIT":
-                Coordinator.split()
-                return "ACK"
+                return Coordinator.split()
             else:
                 return "NOPE"
         except KeyError:
@@ -88,8 +91,10 @@ class Coordinator(Bucket):
 
     def insert(key, val):
         Bucket.dicc[key] = val
+        result = "ACK"
         if len(Bucket.dicc) > 2:
-            Coordinator.split()
+            result = Coordinator.split()
+        return result
 
 
 coordinator = Coordinator(MyTCPHandler)
