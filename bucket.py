@@ -54,10 +54,17 @@ class Bucket:
         lista = msg.split()
         print(lista)
         command = lista[0].upper()
+        if len(lista) > 1 and command in ("INSERT", "QUERY"):
+            key = int(lista[1])
+            location = address(key, Bucket.fs)
+            if location != Bucket.bucketNbr:
+                return Bucket.forward(location, msg) 
         try:
             if command == "INSERT":
-                Bucket.insert(int(lista[1]), lista[2])
-                return "ACK"
+                response = Bucket.insert(int(lista[1]), lista[2])
+                if len(lista) > 3 and lista[3] == "FWD":
+                    response = "IAM {}".format(Bucket.bucketNbr)
+                return response
             elif command == "QUERY":
                 return Bucket.query(int(lista[1]))
             elif command == "POPULATION":
@@ -74,6 +81,7 @@ class Bucket:
 
     def insert(key, val):
         Bucket.dicc[key] = val
+        result = "ACK"
         if len(Bucket.dicc) > 2 and Bucket.bucketNbr > 0:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
@@ -82,10 +90,11 @@ class Bucket:
                 data = "SPLIT"
                 sock.sendall(bytes(data + "\n", "utf-8"))
                 # Receive data from the server
-                received = str(sock.recv(1024), "utf-8")
+                result = str(sock.recv(1024), "utf-8")
             finally:
                 #Close connection
                 sock.close()
+        return result
 
     def query(key):
         return Bucket.dicc[key]
@@ -99,7 +108,6 @@ class Bucket:
         print(Bucket.bucketList)
 
     def rehash(fs):
-        # rehash each key
         print("Rehashing")
         print(fs)
         deleteList = []
@@ -126,6 +134,7 @@ class Bucket:
                     Bucket.population(reply)
             destAddress = Bucket.bucketList[location].split()
             destHost, destPort = destAddress[0], int(destAddress[1])
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 sock.connect((destHost, destPort))
                 data = "INSERT {} {}".format(key, Bucket.dicc[key])
@@ -140,7 +149,42 @@ class Bucket:
         for key in deleteList:
             Bucket.dicc.pop(key)
 
-             
+    def forward(location, msg):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if location not in Bucket.bucketList:
+            try:
+                sock.connect((Bucket.coHost, Bucket.coPort))
+                data = "POPULATE"
+                sock.sendall(bytes(data + "\n", "utf-8"))
+                received = str(sock.recv(1024), "utf-8")
+            finally:
+                #Close connection
+                sock.close()
+            #process reply
+            reply = received.split()
+            Bucket.replyHandler(reply)
+        destAddress = Bucket.bucketList[location].split()
+        destHost, destPort = destAddress[0], int(destAddress[1])
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        received = ""
+        try:
+            sock.connect((destHost, destPort))
+            data = msg + " FWD"
+            sock.sendall(bytes(data + "\n", "utf-8"))
+            received = str(sock.recv(1024), "utf-8")
+        finally:
+            #Close connection
+            sock.close()
+        print(received)
+        return received
+
+def replyHandler(reply):
+    if not reply:
+        return
+    if reply[0] == "POPULATION":
+        Bucket.population(reply) 
+
+
 
 if __name__ == '__main__':            
     bucket = Bucket(MyTCPHandler)
