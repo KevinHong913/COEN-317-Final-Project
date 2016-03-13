@@ -28,10 +28,10 @@ class Bucket:
         self.server = socketserver.TCPServer(address, tcpHandler)
         self.myHost, self.myPort = self.server.server_address #find out ip and port number
         print("My address is", self.myHost, self.myPort)
-
+    
     def register(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try: 
+        try:
             # Connect to coordinator
             data = "REGISTER {0} {1}".format(self.myHost, self.myPort)
             sock.connect((Bucket.coHost, Bucket.coPort))
@@ -47,7 +47,7 @@ class Bucket:
             sock.close()
         print("registered")
         self.server.serve_forever()
-        
+    
     def execute(message):
         msg=message.decode("utf-8")
         msg.strip()
@@ -58,7 +58,7 @@ class Bucket:
             key = int(lista[1])
             location = address(key, Bucket.fs)
             if location != Bucket.bucketNbr:
-                return Bucket.forward(location, msg) 
+                return Bucket.forward(location, msg)
         try:
             if command == "INSERT":
                 response = Bucket.insert(int(lista[1]), lista[2])
@@ -74,6 +74,8 @@ class Bucket:
                 Bucket.fs = FileState(int(lista[1]))
                 Bucket.rehash(Bucket.fs)
                 return "ACK"
+            elif command == "SHOW":
+                return Bucket.show()
             else:   #TODO
                 return "NOPE"
         except KeyError:
@@ -89,9 +91,9 @@ class Bucket:
                 sock.connect((Bucket.coHost, Bucket.coPort))
                 data = "SPLIT"
                 sock.sendall(bytes(data + "\n", "utf-8"))
-#                 # Receive data from the server
-#                 result = str(sock.recv(1024), "utf-8")
-#                 The above line might cause a dead lock
+            #                 # Receive data from the server
+            #                 result = str(sock.recv(1024), "utf-8")
+            #                 The above line might cause a dead lock
             finally:
                 #Close connection
                 sock.close()
@@ -99,7 +101,7 @@ class Bucket:
 
     def query(key):
         return Bucket.dicc[key]
-
+    
     def population(reply):
         print("Populating...")
         i = 1
@@ -107,7 +109,7 @@ class Bucket:
             Bucket.bucketList[int(reply[i])] = " ".join([reply[i+1], reply[i+2]])
             i+=3
         print(Bucket.bucketList)
-
+    
     def rehash(fs):
         print("Rehashing")
         print(fs)
@@ -174,22 +176,25 @@ class Bucket:
             sock.sendall(bytes(data + "\n", "utf-8"))
             received = str(sock.recv(1024), "utf-8")
         finally:
-            #Close connection
+        #Close connection
             sock.close()
         print(received)
         return received
 
-def replyHandler(reply):
-    if not reply:
-        return
-    if reply[0] == "POPULATION":
-        Bucket.population(reply)
-    elif reply[0] == "IAM":
-        Bucket.fs = FileState(int(reply[1])) 
+    def replyHandler(reply):
+        if not reply:
+            return
+        if reply[0] == "POPULATION":
+            Bucket.population(reply)
+        elif reply[0] == "IAM":
+                Bucket.fs = FileState(int(reply[1]))
 
+    def show():
+        result = ""
+        for key,data in Bucket.dicc.items():
+            result += "{0} {1} \n".format(key, data)
+        return result
 
-
-if __name__ == '__main__':            
+if __name__ == '__main__':
     bucket = Bucket(MyTCPHandler)
     bucket.register()
-
