@@ -43,7 +43,10 @@ def main():
         #process reply
         reply = received.split()
         replyHandler(reply)
-        print("Received: {}".format(received))
+        if reply[0] == "POPULATION":
+            printPolulate(reply)
+        else:
+            print("Received: {}".format(received))
 
 
 def requestPopulate():
@@ -64,8 +67,17 @@ def requestPopulate():
     #process reply
     reply = received.split()
     replyHandler(reply)
-    print("Received: {}".format(received))
+    printPolulate(reply)
+    # print("Received: {}".format(received))
     
+def printPolulate(messageArray):
+    print("Received: ", messageArray[0])
+    print("BUCKET NUM    IP-ADDRESS    PORT NUM")
+    bucketNum = (len(messageArray) - 1) / 3
+    bucketNum = int(bucketNum)
+    for i in range(0, bucketNum):
+        print("%10s  %12s    %8s" % (messageArray[ 3*i + 1 ], messageArray[3*i+2], messageArray[3*i+3]))
+
 def replyHandler(reply):
     global bucketAddress
     global fs
@@ -75,7 +87,7 @@ def replyHandler(reply):
         i = 1
         while i < len(reply):
             bucketAddress[int(reply[i])] = " ".join([reply[i+1], reply[i+2]])
-            i+=3
+            i += 3
     elif reply[0] == "IAM":
         fs = FileState(int(reply[1]))
     

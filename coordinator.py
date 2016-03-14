@@ -79,7 +79,7 @@ class Coordinator(Bucket):
             elif command == "REGISTER":
                 bucketNbr = Coordinator.totalBuckets
                 Coordinator.totalBuckets += 1
-                Bucket.bucketList[bucketNbr]="{0} {1}".format(lista[1], lista[2])
+                Bucket.bucketList[bucketNbr] = "{0} {1}".format(lista[1], lista[2])
                 print(Bucket.bucketList)
                 return "{}".format(bucketNbr)
             elif command == "POPULATE":

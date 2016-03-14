@@ -20,7 +20,7 @@ class Bucket:
         Bucket.fs = FileState()
         Bucket.bucketNbr = None
         Bucket.coHost = "localhost"
-        Bucket.coPort = int(sys.argv[1]) if len(sys.argv)>=2 else None
+        Bucket.coPort = int(sys.argv[1]) if len(sys.argv) >= 2 else None
         print(Bucket.coHost, Bucket.coPort)
         Bucket.dicc = {}
         Bucket.bucketList = {}
@@ -49,7 +49,7 @@ class Bucket:
         self.server.serve_forever()
     
     def execute(message):
-        msg=message.decode("utf-8")
+        msg = message.decode("utf-8")
         msg.strip()
         lista = msg.split()
         print(lista)
@@ -107,7 +107,7 @@ class Bucket:
         i = 1
         while i < len(reply):
             Bucket.bucketList[int(reply[i])] = " ".join([reply[i+1], reply[i+2]])
-            i+=3
+            i += 3
         print(Bucket.bucketList)
     
     def rehash(fs):
